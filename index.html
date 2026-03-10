@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0f1117" />
+  <meta name="description" content="WATCH HAVEN - Your personal movie sanctuary." />
+  <title>WATCH HAVEN</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://www.omdbapi.com" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-bg"></div>
+  <main class="container">
+    <header class="hero">
+      <h1>WATCH HAVEN</h1>
+      <p class="tagline">Your personal movie sanctuary.</p>
+
+      <section class="toolbar" aria-label="watchlist controls">
+        <div class="control-block add-block">
+          <label for="movieInput" class="sr-only">Add movie</label>
+          <input id="movieInput" type="text" placeholder="Enter movie title..." autocomplete="off" />
+          <button id="addMovieBtn" class="btn btn-primary">Add Movie</button>
+        </div>
+
+        <div class="control-block search-block">
+          <label for="searchInput" class="sr-only">Search watchlist</label>
+          <input id="searchInput" type="text" placeholder="Search your watchlist..." autocomplete="off" />
+        </div>
+
+        <div class="control-block settings-block">
+          <label for="apiKeyInput" class="sr-only">OMDb API key</label>
+          <input id="apiKeyInput" type="text" placeholder="OMDb API key (optional)" autocomplete="off" />
+          <button id="saveApiKeyBtn" class="btn">Save Key</button>
+        </div>
+
+        <div class="control-block action-block">
+          <button id="layoutToggleBtn" class="btn">Switch to Grid View</button>
+          <button id="clearWatchedBtn" class="btn btn-danger">Clear Watched</button>
+        </div>
+      </section>
+
+      <div class="watchlist-stats">
+        <strong id="movieCounter">0 movies in watchlist</strong>
+      </div>
+    </header>
+
+    <section id="posterSelector" class="poster-selector hidden" aria-live="polite">
+      <div class="selector-header">
+        <h2>Select a Poster</h2>
+        <button id="closePosterSelector" class="btn">Cancel</button>
+      </div>
+      <p id="selectorMovieLabel"></p>
+      <div id="posterGrid" class="poster-grid"></div>
+      <div class="upload-area">
+        <label for="customPosterInput" class="btn">Upload Custom Poster</label>
+        <input id="customPosterInput" type="file" accept="image/*" />
+      </div>
+    </section>
+
+    <section id="recommendations" class="recommendations hidden">
+      <h2>Recommended For You</h2>
+      <div id="recommendationGrid" class="recommendation-grid"></div>
+    </section>
+
+    <section id="watchlistSection" aria-live="polite">
+      <div id="emptyState" class="empty-state">
+        Your WATCH HAVEN is empty. Add a movie to begin your watch journey.
+      </div>
+      <div id="movieList" class="movie-list list-view"></div>
+    </section>
+  </main>
+
+  <template id="movieCardTemplate">
+    <article class="movie-card">
+      <img class="movie-poster" alt="Movie poster" loading="lazy" />
+      <div class="movie-info">
+        <h3 class="movie-title"></h3>
+        <p class="movie-meta"></p>
+        <div class="movie-actions">
+          <button class="btn btn-watch">Mark as Watched</button>
+          <button class="btn btn-trailer">Watch Trailer</button>
+          <button class="btn btn-danger btn-delete">Delete</button>
+        </div>
+      </div>
+    </article>
+  </template>
+
+  <script src="script.js"></script>
+</body>
+</html>
