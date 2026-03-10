@@ -29,6 +29,9 @@
           <input id="searchInput" type="text" placeholder="Search your watchlist..." autocomplete="off" />
         </div>
 
+        <div class="control-block action-block">
+          <button id="layoutToggleBtn" class="btn">Switch to Grid View</button>
+          <button id="shareWatchlistBtn" class="btn">Share Watchlist</button>
         <div class="control-block settings-block">
           <label for="apiKeyInput" class="sr-only">OMDb API key</label>
           <input id="apiKeyInput" type="text" placeholder="OMDb API key (optional)" autocomplete="off" />
@@ -46,6 +49,21 @@
       </div>
     </header>
 
+    <section id="sharePanel" class="panel hidden">
+      <div class="panel-header">
+        <h2>Share Watchlist</h2>
+        <button id="closeSharePanel" class="btn">Close</button>
+      </div>
+      <div class="share-actions">
+        <button id="shareLinkBtn" class="btn">Share as Link</button>
+        <button id="shareImageBtn" class="btn">Share as Image</button>
+        <button id="sharePdfBtn" class="btn">Share as PDF</button>
+      </div>
+      <p id="shareMessage" class="hint"></p>
+    </section>
+
+    <section id="posterSelector" class="panel hidden" aria-live="polite">
+      <div class="panel-header">
     <section id="posterSelector" class="poster-selector hidden" aria-live="polite">
       <div class="selector-header">
         <h2>Select a Poster</h2>
@@ -59,6 +77,7 @@
       </div>
     </section>
 
+    <section id="recommendations" class="panel hidden">
     <section id="recommendations" class="recommendations hidden">
       <h2>Recommended For You</h2>
       <div id="recommendationGrid" class="recommendation-grid"></div>
@@ -73,11 +92,13 @@
   </main>
 
   <template id="movieCardTemplate">
+    <article class="movie-card entering">
     <article class="movie-card">
       <img class="movie-poster" alt="Movie poster" loading="lazy" />
       <div class="movie-info">
         <h3 class="movie-title"></h3>
         <p class="movie-meta"></p>
+        <div class="ratings"></div>
         <div class="movie-actions">
           <button class="btn btn-watch">Mark as Watched</button>
           <button class="btn btn-trailer">Watch Trailer</button>
@@ -87,6 +108,8 @@
     </article>
   </template>
 
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
