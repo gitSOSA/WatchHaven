@@ -9,6 +9,7 @@ const state = {
   pendingMovieTitle: null,
   pendingOmdbResults: [],
   recommendations: []
+  apiKey: localStorage.getItem('watchHavenOmdbApiKey') || ''
 };
 
 const els = {
@@ -35,6 +36,9 @@ const els = {
   template: document.getElementById('movieCardTemplate'),
   recommendations: document.getElementById('recommendations'),
   recommendationGrid: document.getElementById('recommendationGrid')
+  recommendationGrid: document.getElementById('recommendationGrid'),
+  apiKeyInput: document.getElementById('apiKeyInput'),
+  saveApiKeyBtn: document.getElementById('saveApiKeyBtn')
 };
 
 function persist() {
@@ -93,6 +97,10 @@ function load() {
 
   const raw = JSON.parse(localStorage.getItem('watchHavenMovies') || '[]');
   state.movies = Array.isArray(raw) ? raw.map(normalizeMovie) : [];
+function load() {
+  state.movies = JSON.parse(localStorage.getItem('watchHavenMovies') || '[]');
+  if (!Array.isArray(state.movies)) state.movies = [];
+  els.apiKeyInput.value = state.apiKey;
 }
 
 function updateCounter(filteredCount = null) {
@@ -118,6 +126,11 @@ function ratingsHtml(ratings) {
     <p class="rating-line">IMDb: ${ratings?.imdb || 'N/A'}</p>
     <p class="rating-line">Rotten Tomatoes: ${ratings?.rotten || 'N/A'}</p>
   `;
+function saveApiKey() {
+  state.apiKey = els.apiKeyInput.value.trim();
+  localStorage.setItem('watchHavenOmdbApiKey', state.apiKey);
+  els.saveApiKeyBtn.textContent = 'Saved';
+  setTimeout(() => (els.saveApiKeyBtn.textContent = 'Save Key'), 1200);
 }
 
 function createMovieCard(movie) {
@@ -137,6 +150,12 @@ function createMovieCard(movie) {
   ratings.innerHTML = ratingsHtml(movie.ratings);
 
   node.classList.toggle('watched', movie.watched);
+  const details = [movie.year ? `Year: ${movie.year}` : null, movie.rating ? `Rated: ${movie.rating}` : null]
+    .filter(Boolean)
+    .join(' • ');
+  meta.textContent = details || 'Details unavailable';
+
+  node.classList.toggle('watched', !!movie.watched);
   watchBtn.textContent = movie.watched ? 'Mark as Unwatched' : 'Mark as Watched';
 
   watchBtn.addEventListener('click', () => {
@@ -147,6 +166,7 @@ function createMovieCard(movie) {
 
   trailerBtn.addEventListener('click', () => {
     const query = encodeURIComponent(`${movie.title} trailer`);
+    const query = encodeURIComponent(`${movie.title} official trailer`);
     window.open(`https://www.youtube.com/results?search_query=${query}`, '_blank', 'noopener');
   });
 
@@ -168,6 +188,9 @@ function renderMovies() {
   const filtered = getFilteredMovies();
   els.movieList.innerHTML = '';
   filtered.forEach((movie) => els.movieList.appendChild(createMovieCard(movie)));
+  filtered.forEach((movie) => {
+    els.movieList.appendChild(createMovieCard(movie));
+  });
 
   els.emptyState.style.display = state.movies.length ? 'none' : 'block';
   updateCounter(filtered.length);
@@ -183,6 +206,17 @@ async function fetchOmdbSearch(title) {
 async function fetchMovieDetails(imdbID) {
   if (!imdbID) return {};
   const response = await fetch(`${OMDB_BASE}?apikey=${OMDB_API_KEY}&i=${imdbID}&plot=short`);
+  if (!state.apiKey) return [];
+  const url = `${OMDB_BASE}?apikey=${state.apiKey}&s=${encodeURIComponent(title)}&type=movie&page=1`;
+  const response = await fetch(url);
+  const data = await response.json();
+  if (!data.Search) return [];
+  return data.Search.slice(0, 6);
+}
+
+async function fetchMovieDetails(imdbID) {
+  if (!state.apiKey || !imdbID) return {};
+  const response = await fetch(`${OMDB_BASE}?apikey=${state.apiKey}&i=${imdbID}&plot=short`);
   const data = await response.json();
   return data && data.Response !== 'False' ? data : {};
 }
@@ -207,6 +241,12 @@ function showPosterSelector(title, results) {
         imdbID: result.imdbID,
         ratings: parseRatings(details.Ratings || [])
       }));
+      finalizeAddMovie({
+        title: result.Title || title,
+        year: result.Year || '',
+        rating: details.Rated && details.Rated !== 'N/A' ? details.Rated : '',
+        poster: result.Poster !== 'N/A' ? result.Poster : PLACEHOLDER_POSTER
+      });
     });
     els.posterGrid.appendChild(option);
   });
@@ -225,6 +265,8 @@ function showPosterSelector(title, results) {
       rated: details.Rated || '',
       poster: PLACEHOLDER_POSTER
     }));
+  skip.addEventListener('click', () => {
+    finalizeAddMovie({ title, year: '', rating: '', poster: PLACEHOLDER_POSTER });
   });
   els.posterGrid.appendChild(skip);
 
@@ -246,6 +288,19 @@ function finalizeAddMovie(movie) {
   }
 
   state.movies.unshift(normalized);
+function finalizeAddMovie({ title, year, rating, poster }) {
+  const normalized = title.trim();
+  if (!normalized) return;
+
+  state.movies.unshift({
+    id: crypto.randomUUID(),
+    title: normalized,
+    year: year || '',
+    rating: rating || '',
+    poster: poster || PLACEHOLDER_POSTER,
+    watched: false
+  });
+
   persist();
   renderMovies();
   fetchRecommendations();
@@ -260,6 +315,11 @@ async function handleAddMovie() {
     const results = await fetchOmdbSearch(title);
     showPosterSelector(title, results);
   } catch {
+
+  try {
+    const results = await fetchOmdbSearch(title);
+    showPosterSelector(title, results);
+  } catch (error) {
     showPosterSelector(title, []);
   }
 }
@@ -287,6 +347,14 @@ function handleCustomPosterUpload(event) {
       ratings: parseRatings(details.Ratings || []),
       poster: reader.result
     }));
+  reader.onload = () => {
+    const firstResult = state.pendingOmdbResults[0] || {};
+    finalizeAddMovie({
+      title: firstResult.Title || state.pendingMovieTitle,
+      year: firstResult.Year || '',
+      rating: '',
+      poster: reader.result
+    });
     els.customPosterInput.value = '';
   };
   reader.readAsDataURL(file);
@@ -308,6 +376,8 @@ function addRecommendationToWatchlist(rec) {
 
 async function fetchRecommendations() {
   if (state.movies.length === 0) {
+async function fetchRecommendations() {
+  if (state.movies.length === 0 || !state.apiKey) {
     els.recommendations.classList.add('hidden');
     return;
   }
@@ -356,6 +426,34 @@ async function fetchRecommendations() {
 
     els.recommendations.classList.toggle('hidden', detailed.length === 0);
   } catch {
+  const recent = state.movies[0]?.title || '';
+  const firstWord = recent.split(' ')[0];
+  if (!firstWord) {
+    els.recommendations.classList.add('hidden');
+    return;
+  }
+
+  try {
+    const results = await fetchOmdbSearch(`${firstWord} movie`);
+    const existingTitles = new Set(state.movies.map((m) => m.title.toLowerCase()));
+    const picks = results.filter((r) => !existingTitles.has(r.Title.toLowerCase())).slice(0, 3);
+
+    els.recommendationGrid.innerHTML = '';
+    picks.forEach((pick) => {
+      const card = document.createElement('article');
+      card.className = 'rec-card';
+      card.innerHTML = `
+        <img src="${pick.Poster !== 'N/A' ? pick.Poster : PLACEHOLDER_POSTER}" alt="${pick.Title} poster" />
+        <p>${pick.Title} (${pick.Year})</p>
+      `;
+      card.addEventListener('click', () => {
+        window.open(`https://www.imdb.com/title/${pick.imdbID}/`, '_blank', 'noopener');
+      });
+      els.recommendationGrid.appendChild(card);
+    });
+
+    els.recommendations.classList.toggle('hidden', picks.length === 0);
+  } catch (error) {
     els.recommendations.classList.add('hidden');
   }
 }
@@ -468,6 +566,11 @@ async function shareAsPdf() {
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js').catch(() => {}));
+function registerServiceWorker() {
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('service-worker.js').catch(() => {});
+    });
   }
 }
 
@@ -475,6 +578,13 @@ function bindEvents() {
   els.addMovieBtn.addEventListener('click', handleAddMovie);
   els.movieInput.addEventListener('keydown', (e) => e.key === 'Enter' && handleAddMovie());
   els.searchInput.addEventListener('input', (e) => { state.searchTerm = e.target.value; renderMovies(); });
+  els.movieInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') handleAddMovie();
+  });
+  els.searchInput.addEventListener('input', (event) => {
+    state.searchTerm = event.target.value;
+    renderMovies();
+  });
   els.clearWatchedBtn.addEventListener('click', clearWatched);
   els.layoutToggleBtn.addEventListener('click', () => {
     state.layout = state.layout === 'list' ? 'grid' : 'list';
@@ -490,6 +600,11 @@ function bindEvents() {
 
   els.customPosterInput.addEventListener('change', handleCustomPosterUpload);
   els.closePosterSelector.addEventListener('click', () => els.posterSelector.classList.add('hidden'));
+  els.customPosterInput.addEventListener('change', handleCustomPosterUpload);
+  els.closePosterSelector.addEventListener('click', () => {
+    els.posterSelector.classList.add('hidden');
+  });
+  els.saveApiKeyBtn.addEventListener('click', saveApiKey);
 }
 
 function init() {

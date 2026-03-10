@@ -32,6 +32,14 @@
         <div class="control-block action-block">
           <button id="layoutToggleBtn" class="btn">Switch to Grid View</button>
           <button id="shareWatchlistBtn" class="btn">Share Watchlist</button>
+        <div class="control-block settings-block">
+          <label for="apiKeyInput" class="sr-only">OMDb API key</label>
+          <input id="apiKeyInput" type="text" placeholder="OMDb API key (optional)" autocomplete="off" />
+          <button id="saveApiKeyBtn" class="btn">Save Key</button>
+        </div>
+
+        <div class="control-block action-block">
+          <button id="layoutToggleBtn" class="btn">Switch to Grid View</button>
           <button id="clearWatchedBtn" class="btn btn-danger">Clear Watched</button>
         </div>
       </section>
@@ -56,6 +64,8 @@
 
     <section id="posterSelector" class="panel hidden" aria-live="polite">
       <div class="panel-header">
+    <section id="posterSelector" class="poster-selector hidden" aria-live="polite">
+      <div class="selector-header">
         <h2>Select a Poster</h2>
         <button id="closePosterSelector" class="btn">Cancel</button>
       </div>
@@ -68,6 +78,7 @@
     </section>
 
     <section id="recommendations" class="panel hidden">
+    <section id="recommendations" class="recommendations hidden">
       <h2>Recommended For You</h2>
       <div id="recommendationGrid" class="recommendation-grid"></div>
     </section>
@@ -82,6 +93,7 @@
 
   <template id="movieCardTemplate">
     <article class="movie-card entering">
+    <article class="movie-card">
       <img class="movie-poster" alt="Movie poster" loading="lazy" />
       <div class="movie-info">
         <h3 class="movie-title"></h3>
