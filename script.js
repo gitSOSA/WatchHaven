@@ -1,5 +1,4 @@
 const OMDB_BASE = 'https://www.omdbapi.com/';
-const OMDB_API_KEY = 'd23a7494';
 const PLACEHOLDER_POSTER = 'https://via.placeholder.com/300x450/1a1f2b/f2f4f8?text=No+Poster';
 
 const state = {
@@ -8,7 +7,7 @@ const state = {
   searchTerm: '',
   pendingMovieTitle: null,
   pendingOmdbResults: [],
-  recommendations: []
+  apiKey: localStorage.getItem('watchHavenOmdbApiKey') || ''
 };
 
 const els = {
@@ -20,13 +19,6 @@ const els = {
   emptyState: document.getElementById('emptyState'),
   clearWatchedBtn: document.getElementById('clearWatchedBtn'),
   layoutToggleBtn: document.getElementById('layoutToggleBtn'),
-  shareWatchlistBtn: document.getElementById('shareWatchlistBtn'),
-  sharePanel: document.getElementById('sharePanel'),
-  closeSharePanel: document.getElementById('closeSharePanel'),
-  shareMessage: document.getElementById('shareMessage'),
-  shareLinkBtn: document.getElementById('shareLinkBtn'),
-  shareImageBtn: document.getElementById('shareImageBtn'),
-  sharePdfBtn: document.getElementById('sharePdfBtn'),
   posterSelector: document.getElementById('posterSelector'),
   selectorMovieLabel: document.getElementById('selectorMovieLabel'),
   posterGrid: document.getElementById('posterGrid'),
@@ -34,7 +26,9 @@ const els = {
   closePosterSelector: document.getElementById('closePosterSelector'),
   template: document.getElementById('movieCardTemplate'),
   recommendations: document.getElementById('recommendations'),
-  recommendationGrid: document.getElementById('recommendationGrid')
+  recommendationGrid: document.getElementById('recommendationGrid'),
+  apiKeyInput: document.getElementById('apiKeyInput'),
+  saveApiKeyBtn: document.getElementById('saveApiKeyBtn')
 };
 
 function persist() {
@@ -42,46 +36,10 @@ function persist() {
   localStorage.setItem('watchHavenLayout', state.layout);
 }
 
-function parseRatings(ratingsArr = []) {
-  const imdb = ratingsArr.find((r) => r.Source === 'Internet Movie Database')?.Value || 'N/A';
-  const rotten = ratingsArr.find((r) => r.Source === 'Rotten Tomatoes')?.Value || 'N/A';
-  return { imdb, rotten };
-}
-
-function normalizeMovie(movie) {
-  return {
-    id: movie.id || crypto.randomUUID(),
-    title: movie.title || movie.Title || 'Untitled',
-    year: movie.year || movie.Year || '',
-    poster: movie.poster || movie.Poster || PLACEHOLDER_POSTER,
-    imdbID: movie.imdbID || '',
-    watched: !!movie.watched,
-    ratings: movie.ratings || parseRatings(movie.Ratings || []),
-    rated: movie.rated || movie.Rated || ''
-  };
-}
-
-function safeDecode(encoded) {
-  try {
-    return JSON.parse(decodeURIComponent(atob(encoded)));
-  } catch {
-    return null;
-  }
-}
-
 function load() {
-  const urlData = new URLSearchParams(window.location.search).get('wl');
-  if (urlData) {
-    const decoded = safeDecode(urlData);
-    if (Array.isArray(decoded)) {
-      state.movies = decoded.map(normalizeMovie);
-      persist();
-      return;
-    }
-  }
-
-  const raw = JSON.parse(localStorage.getItem('watchHavenMovies') || '[]');
-  state.movies = Array.isArray(raw) ? raw.map(normalizeMovie) : [];
+  state.movies = JSON.parse(localStorage.getItem('watchHavenMovies') || '[]');
+  if (!Array.isArray(state.movies)) state.movies = [];
+  els.apiKeyInput.value = state.apiKey;
 }
 
 function updateCounter(filteredCount = null) {
@@ -102,11 +60,11 @@ function getFilteredMovies() {
   return state.movies.filter((m) => `${m.title} ${m.year || ''}`.toLowerCase().includes(q));
 }
 
-function ratingsHtml(ratings) {
-  return `
-    <p class="rating-line">IMDb: ${ratings?.imdb || 'N/A'}</p>
-    <p class="rating-line">Rotten Tomatoes: ${ratings?.rotten || 'N/A'}</p>
-  `;
+function saveApiKey() {
+  state.apiKey = els.apiKeyInput.value.trim();
+  localStorage.setItem('watchHavenOmdbApiKey', state.apiKey);
+  els.saveApiKeyBtn.textContent = 'Saved';
+  setTimeout(() => (els.saveApiKeyBtn.textContent = 'Save Key'), 1200);
 }
 
 function createMovieCard(movie) {
@@ -114,7 +72,6 @@ function createMovieCard(movie) {
   const poster = node.querySelector('.movie-poster');
   const title = node.querySelector('.movie-title');
   const meta = node.querySelector('.movie-meta');
-  const ratings = node.querySelector('.ratings');
   const watchBtn = node.querySelector('.btn-watch');
   const trailerBtn = node.querySelector('.btn-trailer');
   const deleteBtn = node.querySelector('.btn-delete');
@@ -122,10 +79,12 @@ function createMovieCard(movie) {
   poster.src = movie.poster || PLACEHOLDER_POSTER;
   poster.alt = `${movie.title} poster`;
   title.textContent = movie.title;
-  meta.textContent = [movie.year ? `Year: ${movie.year}` : null, movie.rated ? `Rated: ${movie.rated}` : null].filter(Boolean).join(' • ') || 'Details unavailable';
-  ratings.innerHTML = ratingsHtml(movie.ratings);
+  const details = [movie.year ? `Year: ${movie.year}` : null, movie.rating ? `Rated: ${movie.rating}` : null]
+    .filter(Boolean)
+    .join(' • ');
+  meta.textContent = details || 'Details unavailable';
 
-  node.classList.toggle('watched', movie.watched);
+  node.classList.toggle('watched', !!movie.watched);
   watchBtn.textContent = movie.watched ? 'Mark as Unwatched' : 'Mark as Watched';
 
   watchBtn.addEventListener('click', () => {
@@ -135,7 +94,7 @@ function createMovieCard(movie) {
   });
 
   trailerBtn.addEventListener('click', () => {
-    const query = encodeURIComponent(`${movie.title} trailer`);
+    const query = encodeURIComponent(`${movie.title} official trailer`);
     window.open(`https://www.youtube.com/results?search_query=${query}`, '_blank', 'noopener');
   });
 
@@ -149,29 +108,32 @@ function createMovieCard(movie) {
     }, 230);
   });
 
-  requestAnimationFrame(() => node.classList.remove('entering'));
   return node;
 }
 
 function renderMovies() {
   const filtered = getFilteredMovies();
   els.movieList.innerHTML = '';
-  filtered.forEach((movie) => els.movieList.appendChild(createMovieCard(movie)));
+  filtered.forEach((movie) => {
+    els.movieList.appendChild(createMovieCard(movie));
+  });
 
   els.emptyState.style.display = state.movies.length ? 'none' : 'block';
   updateCounter(filtered.length);
 }
 
 async function fetchOmdbSearch(title) {
-  const url = `${OMDB_BASE}?apikey=${OMDB_API_KEY}&s=${encodeURIComponent(title)}&type=movie&page=1`;
+  if (!state.apiKey) return [];
+  const url = `${OMDB_BASE}?apikey=${state.apiKey}&s=${encodeURIComponent(title)}&type=movie&page=1`;
   const response = await fetch(url);
   const data = await response.json();
-  return data.Search ? data.Search.slice(0, 6) : [];
+  if (!data.Search) return [];
+  return data.Search.slice(0, 6);
 }
 
 async function fetchMovieDetails(imdbID) {
-  if (!imdbID) return {};
-  const response = await fetch(`${OMDB_BASE}?apikey=${OMDB_API_KEY}&i=${imdbID}&plot=short`);
+  if (!state.apiKey || !imdbID) return {};
+  const response = await fetch(`${OMDB_BASE}?apikey=${state.apiKey}&i=${imdbID}&plot=short`);
   const data = await response.json();
   return data && data.Response !== 'False' ? data : {};
 }
@@ -188,14 +150,12 @@ function showPosterSelector(title, results) {
     option.innerHTML = `<img src="${result.Poster !== 'N/A' ? result.Poster : PLACEHOLDER_POSTER}" alt="${result.Title} poster" /><p>${result.Title}</p>`;
     option.addEventListener('click', async () => {
       const details = await fetchMovieDetails(result.imdbID);
-      finalizeAddMovie(normalizeMovie({
+      finalizeAddMovie({
         title: result.Title || title,
         year: result.Year || '',
-        rated: details.Rated && details.Rated !== 'N/A' ? details.Rated : '',
-        poster: result.Poster !== 'N/A' ? result.Poster : PLACEHOLDER_POSTER,
-        imdbID: result.imdbID,
-        ratings: parseRatings(details.Ratings || [])
-      }));
+        rating: details.Rated && details.Rated !== 'N/A' ? details.Rated : '',
+        poster: result.Poster !== 'N/A' ? result.Poster : PLACEHOLDER_POSTER
+      });
     });
     els.posterGrid.appendChild(option);
   });
@@ -203,26 +163,27 @@ function showPosterSelector(title, results) {
   const skip = document.createElement('button');
   skip.className = 'poster-option';
   skip.innerHTML = `<img src="${PLACEHOLDER_POSTER}" alt="Default poster" /><p>Use Default</p>`;
-  skip.addEventListener('click', async () => {
-    const searchPick = results[0];
-    const details = searchPick ? await fetchMovieDetails(searchPick.imdbID) : {};
-    finalizeAddMovie(normalizeMovie({
-      title,
-      year: searchPick?.Year || '',
-      imdbID: searchPick?.imdbID || '',
-      ratings: parseRatings(details.Ratings || []),
-      rated: details.Rated || '',
-      poster: PLACEHOLDER_POSTER
-    }));
+  skip.addEventListener('click', () => {
+    finalizeAddMovie({ title, year: '', rating: '', poster: PLACEHOLDER_POSTER });
   });
   els.posterGrid.appendChild(skip);
 
   els.posterSelector.classList.remove('hidden');
 }
 
-function finalizeAddMovie(movie) {
-  if (!movie.title.trim()) return;
-  state.movies.unshift(normalizeMovie(movie));
+function finalizeAddMovie({ title, year, rating, poster }) {
+  const normalized = title.trim();
+  if (!normalized) return;
+
+  state.movies.unshift({
+    id: crypto.randomUUID(),
+    title: normalized,
+    year: year || '',
+    rating: rating || '',
+    poster: poster || PLACEHOLDER_POSTER,
+    watched: false
+  });
+
   persist();
   renderMovies();
   fetchRecommendations();
@@ -233,10 +194,11 @@ function finalizeAddMovie(movie) {
 async function handleAddMovie() {
   const title = els.movieInput.value.trim();
   if (!title) return;
+
   try {
     const results = await fetchOmdbSearch(title);
     showPosterSelector(title, results);
-  } catch {
+  } catch (error) {
     showPosterSelector(title, []);
   }
 }
@@ -253,215 +215,85 @@ function handleCustomPosterUpload(event) {
   if (!file || !state.pendingMovieTitle) return;
 
   const reader = new FileReader();
-  reader.onload = async () => {
+  reader.onload = () => {
     const firstResult = state.pendingOmdbResults[0] || {};
-    const details = firstResult.imdbID ? await fetchMovieDetails(firstResult.imdbID) : {};
-    finalizeAddMovie(normalizeMovie({
+    finalizeAddMovie({
       title: firstResult.Title || state.pendingMovieTitle,
       year: firstResult.Year || '',
-      rated: details.Rated || '',
-      imdbID: firstResult.imdbID || '',
-      ratings: parseRatings(details.Ratings || []),
+      rating: '',
       poster: reader.result
-    }));
+    });
     els.customPosterInput.value = '';
   };
   reader.readAsDataURL(file);
 }
 
-function addRecommendationToWatchlist(rec) {
-  const exists = state.movies.some((m) => m.title.toLowerCase() === rec.Title.toLowerCase() && m.year === rec.Year);
-  if (exists) return;
-
-  finalizeAddMovie(normalizeMovie({
-    title: rec.Title,
-    year: rec.Year,
-    poster: rec.Poster !== 'N/A' ? rec.Poster : PLACEHOLDER_POSTER,
-    imdbID: rec.imdbID,
-    rated: rec.Rated || '',
-    ratings: rec.parsedRatings || { imdb: 'N/A', rotten: 'N/A' }
-  }));
-}
-
 async function fetchRecommendations() {
-  if (state.movies.length === 0) {
+  if (state.movies.length === 0 || !state.apiKey) {
     els.recommendations.classList.add('hidden');
     return;
   }
 
-  const keyword = state.movies[0].title.split(' ')[0];
-  if (!keyword) return;
+  const recent = state.movies[0]?.title || '';
+  const firstWord = recent.split(' ')[0];
+  if (!firstWord) {
+    els.recommendations.classList.add('hidden');
+    return;
+  }
 
   try {
-    const raw = await fetchOmdbSearch(`${keyword} movie`);
-    const existing = new Set(state.movies.map((m) => m.title.toLowerCase()));
-    const picks = raw.filter((r) => !existing.has(r.Title.toLowerCase())).slice(0, 3);
+    const results = await fetchOmdbSearch(`${firstWord} movie`);
+    const existingTitles = new Set(state.movies.map((m) => m.title.toLowerCase()));
+    const picks = results.filter((r) => !existingTitles.has(r.Title.toLowerCase())).slice(0, 3);
 
-    const detailed = await Promise.all(
-      picks.map(async (pick) => {
-        const details = await fetchMovieDetails(pick.imdbID);
-        return { ...pick, Rated: details.Rated || '', parsedRatings: parseRatings(details.Ratings || []) };
-      })
-    );
-
-    state.recommendations = detailed;
     els.recommendationGrid.innerHTML = '';
-
-    detailed.forEach((pick, index) => {
+    picks.forEach((pick) => {
       const card = document.createElement('article');
       card.className = 'rec-card';
-      card.style.animation = `rise .35s ease ${index * 80}ms both`;
       card.innerHTML = `
         <img src="${pick.Poster !== 'N/A' ? pick.Poster : PLACEHOLDER_POSTER}" alt="${pick.Title} poster" />
-        <p class="rec-title">${pick.Title} (${pick.Year})</p>
-        <p class="rating-line">IMDb: ${pick.parsedRatings.imdb}</p>
-        <p class="rating-line">Rotten Tomatoes: ${pick.parsedRatings.rotten}</p>
-        <div class="rec-actions">
-          <button class="btn btn-add">Add to Watchlist</button>
-          <button class="btn btn-trailer">Watch Trailer</button>
-        </div>
+        <p>${pick.Title} (${pick.Year})</p>
       `;
-
-      card.querySelector('.btn-add').addEventListener('click', () => addRecommendationToWatchlist(pick));
-      card.querySelector('.btn-trailer').addEventListener('click', () => {
-        const query = encodeURIComponent(`${pick.Title} trailer`);
-        window.open(`https://www.youtube.com/results?search_query=${query}`, '_blank', 'noopener');
+      card.addEventListener('click', () => {
+        window.open(`https://www.imdb.com/title/${pick.imdbID}/`, '_blank', 'noopener');
       });
-
       els.recommendationGrid.appendChild(card);
     });
 
-    els.recommendations.classList.toggle('hidden', detailed.length === 0);
-  } catch {
+    els.recommendations.classList.toggle('hidden', picks.length === 0);
+  } catch (error) {
     els.recommendations.classList.add('hidden');
   }
-}
-
-function openSharePanel() {
-  els.sharePanel.classList.remove('hidden');
-  els.shareMessage.textContent = '';
-}
-
-function shareAsLink() {
-  if (!state.movies.length) {
-    els.shareMessage.textContent = 'Add movies before sharing.';
-    return;
-  }
-
-  const payload = btoa(encodeURIComponent(JSON.stringify(state.movies)));
-  const url = `${window.location.origin}${window.location.pathname}?wl=${payload}`;
-  navigator.clipboard?.writeText(url).catch(() => {});
-  els.shareMessage.textContent = `Share link copied (or shown here): ${url}`;
-}
-
-function createExportPages() {
-  const pageSize = 6;
-  const pages = [];
-  for (let i = 0; i < state.movies.length; i += pageSize) pages.push(state.movies.slice(i, i + pageSize));
-  return pages;
-}
-
-function makeExportPageDom(moviesChunk, pageIndex, totalPages) {
-  const wrap = document.createElement('section');
-  wrap.className = 'export-page';
-  wrap.innerHTML = `
-    <div class="export-head">
-      <h2>WATCH HAVEN</h2>
-      <p>Your personal movie sanctuary. • Page ${pageIndex + 1} of ${totalPages}</p>
-    </div>
-    <div class="export-grid"></div>
-  `;
-  const grid = wrap.querySelector('.export-grid');
-
-  moviesChunk.forEach((movie) => {
-    const item = document.createElement('article');
-    item.className = 'export-item';
-    item.innerHTML = `
-      <img src="${movie.poster || PLACEHOLDER_POSTER}" alt="${movie.title}" />
-      <div>
-        <strong>${movie.title}</strong><br />
-        ${movie.year || 'Year N/A'}<br />
-        IMDb: ${movie.ratings?.imdb || 'N/A'}<br />
-        Rotten Tomatoes: ${movie.ratings?.rotten || 'N/A'}
-      </div>
-    `;
-    grid.appendChild(item);
-  });
-
-  return wrap;
-}
-
-async function shareAsImage() {
-  if (!state.movies.length) return (els.shareMessage.textContent = 'Add movies before exporting.');
-
-  const pages = createExportPages();
-  for (let i = 0; i < pages.length; i += 1) {
-    const dom = makeExportPageDom(pages[i], i, pages.length);
-    dom.style.position = 'fixed';
-    dom.style.left = '-99999px';
-    document.body.appendChild(dom);
-
-    const canvas = await html2canvas(dom, { backgroundColor: '#0f1320', scale: 2 });
-    dom.remove();
-
-    const link = document.createElement('a');
-    link.download = `watch-haven-${i + 1}.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-  }
-
-  els.shareMessage.textContent = `Generated ${pages.length} image file(s).`;
-}
-
-async function shareAsPdf() {
-  if (!state.movies.length) return (els.shareMessage.textContent = 'Add movies before exporting.');
-
-  const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [900, 1600] });
-  const pages = createExportPages();
-
-  for (let i = 0; i < pages.length; i += 1) {
-    const dom = makeExportPageDom(pages[i], i, pages.length);
-    dom.style.position = 'fixed';
-    dom.style.left = '-99999px';
-    document.body.appendChild(dom);
-
-    const canvas = await html2canvas(dom, { backgroundColor: '#0f1320', scale: 2 });
-    dom.remove();
-
-    if (i > 0) pdf.addPage([900, 1600], 'portrait');
-    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 900, 1600);
-  }
-
-  pdf.save('watch-haven-watchlist.pdf');
-  els.shareMessage.textContent = `Generated PDF with ${pages.length} page(s).`;
 }
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js').catch(() => {}));
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('service-worker.js').catch(() => {});
+    });
   }
 }
 
 function bindEvents() {
   els.addMovieBtn.addEventListener('click', handleAddMovie);
-  els.movieInput.addEventListener('keydown', (e) => e.key === 'Enter' && handleAddMovie());
-  els.searchInput.addEventListener('input', (e) => { state.searchTerm = e.target.value; renderMovies(); });
+  els.movieInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') handleAddMovie();
+  });
+  els.searchInput.addEventListener('input', (event) => {
+    state.searchTerm = event.target.value;
+    renderMovies();
+  });
   els.clearWatchedBtn.addEventListener('click', clearWatched);
   els.layoutToggleBtn.addEventListener('click', () => {
     state.layout = state.layout === 'list' ? 'grid' : 'list';
     persist();
     applyLayout();
   });
-
-  els.shareWatchlistBtn.addEventListener('click', openSharePanel);
-  els.closeSharePanel.addEventListener('click', () => els.sharePanel.classList.add('hidden'));
-  els.shareLinkBtn.addEventListener('click', shareAsLink);
-  els.shareImageBtn.addEventListener('click', shareAsImage);
-  els.sharePdfBtn.addEventListener('click', shareAsPdf);
-
   els.customPosterInput.addEventListener('change', handleCustomPosterUpload);
-  els.closePosterSelector.addEventListener('click', () => els.posterSelector.classList.add('hidden'));
+  els.closePosterSelector.addEventListener('click', () => {
+    els.posterSelector.classList.add('hidden');
+  });
+  els.saveApiKeyBtn.addEventListener('click', saveApiKey);
 }
 
 function init() {
