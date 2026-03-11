@@ -3,113 +3,74 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#0f1117" />
-  <meta name="description" content="WATCH HAVEN - Your personal movie sanctuary." />
-  <title>WATCH HAVEN</title>
-  <link rel="manifest" href="manifest.json" />
-  <link rel="preconnect" href="https://www.omdbapi.com" />
+  <title>MoodSync - Music for Every Mood</title>
   <link rel="stylesheet" href="style.css" />
 </head>
-<body>
-  <div class="app-bg"></div>
-  <main class="container">
-    <header class="hero">
-      <h1>WATCH HAVEN</h1>
-      <p class="tagline">Your personal movie sanctuary.</p>
-
-      <section class="toolbar" aria-label="watchlist controls">
-        <div class="control-block add-block">
-          <label for="movieInput" class="sr-only">Add movie</label>
-          <input id="movieInput" type="text" placeholder="Enter movie title..." autocomplete="off" />
-          <button id="addMovieBtn" class="btn btn-primary">Add Movie</button>
-        </div>
-
-        <div class="control-block search-block">
-          <label for="searchInput" class="sr-only">Search watchlist</label>
-          <input id="searchInput" type="text" placeholder="Search your watchlist..." autocomplete="off" />
-        </div>
-
-        <div class="control-block action-block">
-          <button id="layoutToggleBtn" class="btn">Switch to Grid View</button>
-          <button id="shareWatchlistBtn" class="btn">Share Watchlist</button>
-        <div class="control-block settings-block">
-          <label for="apiKeyInput" class="sr-only">OMDb API key</label>
-          <input id="apiKeyInput" type="text" placeholder="OMDb API key (optional)" autocomplete="off" />
-          <button id="saveApiKeyBtn" class="btn">Save Key</button>
-        </div>
-
-        <div class="control-block action-block">
-          <button id="layoutToggleBtn" class="btn">Switch to Grid View</button>
-          <button id="clearWatchedBtn" class="btn btn-danger">Clear Watched</button>
-        </div>
-      </section>
-
-      <div class="watchlist-stats">
-        <strong id="movieCounter">0 movies in watchlist</strong>
+<body data-mood="chill">
+  <div class="bg-overlay"></div>
+  <main class="app">
+    <header class="mood-header glass">
+      <h1><i data-lucide="music"></i> What's your vibe today?</h1>
+      <div class="mood-buttons" aria-label="Choose your mood">
+        <button class="mood-btn" data-mood="chill"><i data-lucide="smile"></i> Chill</button>
+        <button class="mood-btn" data-mood="hype"><i data-lucide="flame"></i> Hype</button>
+        <button class="mood-btn" data-mood="heartbreak"><i data-lucide="heart-crack"></i> Heartbreak</button>
+        <button class="mood-btn" data-mood="focus"><i data-lucide="target"></i> Focus</button>
+        <button class="mood-btn" data-mood="latenight"><i data-lucide="moon"></i> Late Night</button>
       </div>
+      <p id="moodQuote" class="mood-quote"></p>
     </header>
 
-    <section id="sharePanel" class="panel hidden">
-      <div class="panel-header">
-        <h2>Share Watchlist</h2>
-        <button id="closeSharePanel" class="btn">Close</button>
+    <section class="player-section glass">
+      <div class="album-wrap">
+        <img id="albumArt" src="images/placeholder-cover.svg" alt="Album artwork" />
       </div>
-      <div class="share-actions">
-        <button id="shareLinkBtn" class="btn">Share as Link</button>
-        <button id="shareImageBtn" class="btn">Share as Image</button>
-        <button id="sharePdfBtn" class="btn">Share as PDF</button>
+      <h2 id="songTitle">Select a mood to start</h2>
+      <p id="artistName">MoodSync</p>
+
+      <audio id="audioPlayer"></audio>
+
+      <div class="visualizer-box">
+        <canvas id="visualizer" width="900" height="120" aria-label="Audio visualizer"></canvas>
       </div>
-      <p id="shareMessage" class="hint"></p>
+
+      <div class="controls">
+        <button id="shuffleBtn" class="control-btn" aria-label="Shuffle"><i data-lucide="shuffle"></i></button>
+        <button id="prevBtn" class="control-btn" aria-label="Previous"><i data-lucide="skip-back"></i></button>
+        <button id="playBtn" class="control-btn play-btn" aria-label="Play"><i data-lucide="play"></i></button>
+        <button id="pauseBtn" class="control-btn" aria-label="Pause"><i data-lucide="pause"></i></button>
+        <button id="nextBtn" class="control-btn" aria-label="Next"><i data-lucide="skip-forward"></i></button>
+        <button id="repeatBtn" class="control-btn" aria-label="Repeat"><i data-lucide="repeat"></i></button>
+      </div>
+
+      <div class="progress-wrap">
+        <span id="currentTime">0:00</span>
+        <input id="progressBar" type="range" min="0" max="100" value="0" aria-label="Seek" />
+        <span id="totalDuration">0:00</span>
+      </div>
+
+      <div class="volume-wrap">
+        <label for="volumeSlider"><i data-lucide="volume-2"></i></label>
+        <input id="volumeSlider" type="range" min="0" max="1" step="0.01" value="0.8" />
+      </div>
     </section>
 
-    <section id="posterSelector" class="panel hidden" aria-live="polite">
-      <div class="panel-header">
-    <section id="posterSelector" class="poster-selector hidden" aria-live="polite">
-      <div class="selector-header">
-        <h2>Select a Poster</h2>
-        <button id="closePosterSelector" class="btn">Cancel</button>
-      </div>
-      <p id="selectorMovieLabel"></p>
-      <div id="posterGrid" class="poster-grid"></div>
-      <div class="upload-area">
-        <label for="customPosterInput" class="btn">Upload Custom Poster</label>
-        <input id="customPosterInput" type="file" accept="image/*" />
-      </div>
-    </section>
-
-    <section id="recommendations" class="panel hidden">
-    <section id="recommendations" class="recommendations hidden">
-      <h2>Recommended For You</h2>
-      <div id="recommendationGrid" class="recommendation-grid"></div>
-    </section>
-
-    <section id="watchlistSection" aria-live="polite">
-      <div id="emptyState" class="empty-state">
-        Your WATCH HAVEN is empty. Add a movie to begin your watch journey.
-      </div>
-      <div id="movieList" class="movie-list list-view"></div>
+    <section class="playlist-section glass">
+      <h3 id="playlistTitle"><i data-lucide="music"></i> Playlist</h3>
+      <ul id="playlist" class="playlist"></ul>
     </section>
   </main>
 
-  <template id="movieCardTemplate">
-    <article class="movie-card entering">
-    <article class="movie-card">
-      <img class="movie-poster" alt="Movie poster" loading="lazy" />
-      <div class="movie-info">
-        <h3 class="movie-title"></h3>
-        <p class="movie-meta"></p>
-        <div class="ratings"></div>
-        <div class="movie-actions">
-          <button class="btn btn-watch">Mark as Watched</button>
-          <button class="btn btn-trailer">Watch Trailer</button>
-          <button class="btn btn-danger btn-delete">Delete</button>
-        </div>
-      </div>
-    </article>
-  </template>
+  <aside id="miniPlayer" class="mini-player glass">
+    <img id="miniArt" src="images/placeholder-cover.svg" alt="Mini player album art" />
+    <div class="mini-info">
+      <strong id="miniTitle">No track playing</strong>
+    </div>
+    <button id="miniPlayPauseBtn" class="control-btn" aria-label="Play or Pause"><i data-lucide="play"></i></button>
+    <button id="miniNextBtn" class="control-btn" aria-label="Next"><i data-lucide="skip-forward"></i></button>
+  </aside>
 
-  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
   <script src="script.js"></script>
 </body>
 </html>
